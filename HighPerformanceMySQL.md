@@ -87,7 +87,7 @@
   - 只在 [提交读 read committed] 和 [可重复读 repeatable read] 隔离级别下可行  
   - 非阻塞的读操作，写操作只锁定必要行
   - 通过报错时间点快照实现
-  - 乐观锁，悲观锁
+  - 乐观锁，悲观锁 （Refer: [MySQL 乐观锁与悲观锁](https://www.jianshu.com/p/f5ff017db62a)）
   - InnoDB 的 MVCC 具体实现
     - 每行记录后面两个隐藏列（创建版本号，删除版本号）
     - Select 
@@ -247,5 +247,62 @@ notes: length mean the size of data with unit Byte.
 - 数据仓库：数据量10T以上级别
 - 转换表的存储引擎
   - `alter table mytable ENGINE = xxxx`
+  
   - 执行时间长：逐行复制数据并且在原表加锁
+  
   - 转换后将失去特性，即使转回也无法恢复
+  
+  - 全量复制，执行过程可以加锁，创建一个同数据的新引擎表
+  
+    - `create table inno_table LIKE myisam_table`
+  
+    - `alter table inno_table ENGINE=InnoDB`
+  
+    - `insert into inno_table select * from myisam_table`
+  
+    - 数据量大的时候可以分批处理
+  
+      ```mysql
+      start transaction;
+      insert into inno_table 
+          (select * from myisam_table where id between x and y);
+      commit;    
+      ```
+
+- 导入导出工具 **mysqldump**
+
+  
+
+## C2 benchmark 基准测试
+
+- 尽量简单直接，结果容易相互比较，成本低且易执行
+- 策略
+  - 集成式 full-stack
+  - 单组件式 single-component 
+- 只测试 MySQL 
+  - 比较不同schema或查询的性能
+  - 针对某个具体问题
+  - 测试迭代 
+- 明确测试目标，以确认指标
+  - 吞吐量：单位时间事务处理数
+  - 响应时间或延迟：百分比响应时间（95%都在5ms内）
+  - 并发
+    - web无状态，应该测并发请求
+    - 数据库可以有大量连接，但可能同时只有少数连接在执行查询
+    - 同时工作的线程或者连接数
+    - 一般用于测试不同并发下的性能
+  - 可扩展性
+    - 增加资源或者增加负载
+  - 测试应注意避开低级错误
+    - 数据集：要全集，非均匀数据分布，均匀分布参数。
+    - 多用户和单用户不同，分布式测试需要分布式服务器。
+    - 要和真实用户行为匹配，不一定是连续请求。
+    - 反复执行同一个查询（缓存利用）
+    - 检查错误日志，某个查询变快了可能是语法错误导致未执行。
+    - 系统预热需要时间
+  - 基准测试应该运行足够长的时间，以测试文档状态的性能
+    - 不能只做一系列短期测试（eg. 60s）来评估系统性能
+  - 测试需要收集被测试系统的信息，系统状态以及各性能指标
+  - 数据图形能发现一些问题
+  - 集成测试工具
+    - 
